@@ -1,0 +1,13 @@
+FROM jupyter/scipy-notebook
+
+USER root
+COPY ./ /src
+WORKDIR /src
+RUN pip install -U pip && \
+    pip install -e .[test]
+
+VOLUME /tests
+WORKDIR /tests
+
+# Run all tests in this directory
+CMD ["py.test", "-v", "."]

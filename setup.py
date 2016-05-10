@@ -6,16 +6,18 @@ with open('README.md') as f:
     readme = f.read()
 
 install_requires = [
-    'numpy',
-    'scipy'
+    'numpy>=1.10',
+    'pandas>=0.17',
+    'scipy>=0.16',
+    'sklearn>=0.16'
 ]
 tests_require = [
+    'ipython>=4.0',
     'pdbpp==0.8.1',
-    'pytest',
-    'pytest-cov',
-    'ipython'
+    'pytest>=2.9.1',
+    'pytest-cov>=2.2.1'
 ] + install_requires
-graphlab_requires = 'graphlab-create' + 'install_requires'
+graphlab_requires = ['graphlab-create>=1.9'] + install_requires
 
 setup(
     name='mlsl',
