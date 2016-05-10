@@ -15,6 +15,7 @@ tests_require = [
     'pytest-cov',
     'ipython'
 ] + install_requires
+graphlab_requires = 'graphlab-create' + 'install_requires'
 
 setup(
     name='mlsl',
@@ -30,6 +31,7 @@ setup(
     tests_require=tests_require,
     extras_require={
         'test': tests_require,
+        'graphlab': graphlab_requires
     },
     zip_safe=False,
     include_package_data=True
