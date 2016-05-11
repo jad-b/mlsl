@@ -6,6 +6,6 @@ services:
       dockerfile: Dockerfile.test
       context: .
     volumes:
-      - ./:/tests
+      - ./:/src
     command: >
-      py.test -v -s --pdb .
+      py.test -v -s --pdb mlsl/tests

@@ -9,7 +9,7 @@ install_requires = [
     'numpy>=1.10',
     'pandas>=0.17',
     'scipy>=0.16',
-    'sklearn>=0.16'
+    'scikit-learn>=0.16'
 ]
 tests_require = [
     'ipython>=4.0',
