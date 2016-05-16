@@ -8,21 +8,11 @@ import pandas
 import pytest
 from sklearn.cross_validation import train_test_split
 
+from mlsl.dataset import Dataset, DATASET_DIR, TrainTestSplit
 from mlsl.linreg import LinearRegression
 from mlsl.log import testlog, perflog
-from mlsl import MLSL_DIR, util
 
 
-TrainTestSplit = namedtuple("TrainTestSplit", ["X_train", "X_test",
-                                               "y_train", "y_test"])
-DATASET_DIR = os.path.join(MLSL_DIR, 'datasets')
-Dataset = namedtuple("Dataset",
-        ["data",  # Loaded data
-         "relpath",   # Path to the source of the data on the filesystem
-         "accuracy",  # Prediction accuracy our model should reach
-         "target",  # The feature we're trying to predict
-         "features"]  # A sub-set of features of the data we're going to train on
-        )
 # Collection of datasets fit for Linear Regression
 linreg_datasets = (
     Dataset(None, 'mlfoundations/kc_house_data.csv', '1', 'price',
@@ -64,12 +54,12 @@ def test_least_squares():
     TC = namedtuple('TC', ['X', 'y', 'theta', 'cost', 'grad'])
     testcases = [
         TC(np.array([[1, 2], [1, 3], [1, 4], [1, 5]]),
-           np.array([[7,6,5,4]]).T,
+           np.array([[7, 6, 5, 4]]).T,
            np.array([[0.1, 0.2]]).T,
            11.9450,
            None),
-        TC(np.array([[1,2,3], [1,3,4], [1,4,5], [1,5,6]]),
-           np.array([[7,6,5,4]]).T,
+        TC(np.array([[1, 2, 3], [1, 3, 4], [1, 4, 5], [1, 5, 6]]),
+           np.array([[7, 6, 5, 4]]).T,
            np.array([[0.1, 0.2, 0.3]]).T,
            7.0175,
            None),

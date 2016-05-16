@@ -28,7 +28,7 @@ class LinearRegression:
     """
 
     def __init__(self, *, weights=None):
-        self.weights = weights or []
+        self.weights = weights
         self.accuracy = None
 
     def fit(self, X, y, fn=None, **kwargs):
@@ -120,7 +120,6 @@ class LinearRegression:
         assert y.ndim == 2, "y should be a column vector"
         assert y.shape[1] == 1, "y should be a column vector"
         m = len(y)  # Number of samples
-        n = X.shape[1]  # Number of features
         # J = The cost of our current model
         #   = 1/(2m) * sum((y - Xw)^2)
         #   = 1/(2m) * sum((predictions - actual)^2)
@@ -135,12 +134,13 @@ class LinearRegression:
         #    = 1/m * X'(y - Xw)
         #    = 1/m * X'(error)
         dJ = (1/m) * X.T.dot(error)
-        assert dJ.shape == self.weights.shape, "dJ should have the same dims as y"
+        assert dJ.shape == self.weights.shape, \
+            "dJ should have the same dims as y"
         return np.asscalar(J), dJ
 
     # Learning function
     def batch_gradient_descent(self, X, y, alpha=1e-3, maxiters=np.inf,
-            tolerance=1e-9, **kwargs):
+                               tolerance=1e-9, **kwargs):
         """
         .. math::
             \\theta_{j} := \\alpha\\frac{1}{m}\sum_{i=1}^m
@@ -156,7 +156,7 @@ class LinearRegression:
         while change > tolerance and iters < maxiters:  # Check for convergence
             # Find cost and partial derivatives for update
             J, dJ = self.cost(X, y)
-            # Update each weight by a "step", its respective partial derivative.
+            # Update each weight by a "step", its respective partial derivative
             # Using a vector (numpy array) lets us update in parallel.
             # Multiplying by alpha, a fraction, reduces our chance of
             # overstepping and overshooting our target
@@ -174,7 +174,7 @@ class LinearRegression:
 
     # Learning function
     def stochastic_gradient_descent(self, X, y, alpha=1e-3, maxiters=np.inf,
-            tolerance=1e-9, **kwargs):
+                                    tolerance=1e-9, **kwargs):
         # A general default is to initialize weights to zero.
         if self.weights is None:
             self.weights = np.zeros((X.shape[1], 1))  # A column vector
@@ -189,14 +189,14 @@ class LinearRegression:
             for i, x in enumerate(X):
                 # Find cost and partial derivatives for update
                 J, dJ = self.cost(
-                        x.reshape((1, x.shape[0])),  # => (1 x features) row vector
-                        y[i].reshape((1,1))  # => 1x1 matrix|column vector
+                        x.reshape((1, x.shape[0])),  # => (1xFeatures) row vec
+                        y[i].reshape((1, 1))  # => 1x1 matrix|column vector
                         )
                 # assert J < prevJ, "Cost is increasing"
-                # Update each weight by a "step", its respective partial derivative.
-                # Using a vector (numpy array) lets us update in parallel.
-                # Multiplying by alpha, a fraction, reduces our chance of
-                # overstepping and thus overshooting our target
+                # Update each weight by a "step", its respective partial
+                # derivative. Using a vector (numpy array) lets us update in
+                # parallel.  Multiplying by alpha, a fraction, reduces our
+                # chance of overstepping and thus overshooting our target
                 self.weights -= alpha * dJ
                 # Check for convergence
                 change = math.fabs(prevJ - J)
