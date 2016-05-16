@@ -18,8 +18,11 @@ def load_graphlab():
         raise "Graphlab is only available in Python 2"
     start = time.clock()  # noqa
     import graphlab
-    gl_product_key = os.getenv('GLCREATE_PRODUCT_KEY',
-                               False)
+    gl_product_key = os.getenv('GLCREATE_PRODUCT_KEY', False)
+    if not gl_product_key:
+        print("Please set GLCREATE_PRODUCT_KEY")
+        return
+
     graphlab.product_key.set_product_key(gl_product_key)
     # Display graphlab canvas in notebook
     graphlab.canvas.set_target('ipynb')
