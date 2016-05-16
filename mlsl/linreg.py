@@ -7,7 +7,7 @@ from scipy import linalg
 from sklearn.utils import shuffle
 
 from mlsl.log import log, perflog
-from mlsl.util import to_ndarray, add_bias_column
+from mlsl import util
 
 
 class LinearRegression:
@@ -35,20 +35,16 @@ class LinearRegression:
         """Fit the model to the data. Learns || updates model parameters."""
         # Allow the user to determine how we learn the model parameters.
         if fn is None:
-            fn = self.stochastic_gradient_descent
-        # Make sure we're using numpy n-dimensional arrays
-        X, y = to_ndarray(X), to_ndarray(y)
-        assert isinstance(X, np.ndarray)
-        assert isinstance(y, np.ndarray)
-        # Add a "bias" column of 1s. Since multiplying by 1 acts as a no-op, we
-        # can learn a parameter to describe the "bias" in the data.
-        X = add_bias_column(X)
+            fn = self.batch_gradient_descent
+        X, y = util.prepare_data_matrix(X), util.to_ndarray(y)
+        if y.ndim != 2 or y.shape[1] != 1:  # If y's not a column vector
+            y = y.reshape((len(y), 1))
         log.debug("Fitting model to data (%d samples x %d features)",
                   X.shape[0], X.shape[1])
 
-        start = time.clock()
-        self.weights = fn(X, y, **kwargs)
-        perflog.info("Fit model in %.3f seconds", time.clock() - start)
+        self.weights, metadata = fn(X, y, **kwargs)
+        if metadata:
+            log.info(util.format_metadata(metadata), metadata)
 
         return self.weights
 
@@ -73,7 +69,11 @@ class LinearRegression:
         return J, dJ
 
     def predict(self, X):
-        """Predict values of y from X, using our model."""
+        """Predict values of y from X, using our model.
+
+        .. math::
+            h_{\\theta}(x) = \\theta_{0} + \\theta_{1}x
+        """
         start = time.clock()
         h = X.dot(self.weights)
         perflog.info("Predicted %d values in %.3f seconds", X.shape[1],
@@ -82,6 +82,7 @@ class LinearRegression:
 
     def evaluate(self, X, y):
         """Determine accuracy of our model against labeled data (y)."""
+        X, y = util.prepare_data_matrix(X), util.to_ndarray(y)
         h = self.predict(X)
         assert len(h) == len(y)
         self.accuracy = (h == y).sum() / len(y)
@@ -104,27 +105,55 @@ class LinearRegression:
         # (X^T*X)^-1 * X^T
         Xt = linalg.inv(X.T.dot(X)).dot(X.T)
         # Multiply the pseudo-inverse by y
-        return Xt.dot(y)
+        return Xt.dot(y), None
 
     # Cost Function
-    def _least_squares(self, X, y):
-        """Find the cost using the least squares regression."""
-        # Our predictions
-        h = X.dot(self.weights)
-        # The error of our predictions, compared to the actual values
-        err = y - h
-        # The cost of our predictions
-        J = err.T.dot(err)
-        # The gradient||vector of partial derivatives
-        dJ = -2*X.T.dot(h)
-        return J, dJ
+    def _least_squares(self, X, y, lambda_=0, **kwargs):
+        """Find the cost using the least squares regression.
 
-    def batch_gradient_descent(self, X, y, alpha=.01, tolerance=1e-9, **kwargs):
+        .. math::
+            h_{\\theta}(x) = \\theta_{0} + \\theta_{1}x
+            J(\\theta) =
+                \\frac{1}{2m}\sum_{i=1}^m(h_{\\theta}(x^{i}) - y^{i})^{2}
+        """
+        assert X.ndim == 2, "X should be a matrix"
+        assert y.ndim == 2, "y should be a column vector"
+        assert y.shape[1] == 1, "y should be a column vector"
+        m = len(y)  # Number of samples
+        n = X.shape[1]  # Number of features
+        # J = The cost of our current model
+        #   = 1/(2m) * sum((y - Xw)^2)
+        #   = 1/(2m) * sum((predictions - actual)^2)
+        # Our predictions
+        predictions = X.dot(self.weights)
+        # The error of our predictions, compared to the actual values
+        error = predictions - y
+        # J = 1/(2m) * sum(error^2)
+        J = (1/(2*m)) * error.T.dot(error)
+        assert J.shape == (1, 1)
+        # dJ = The gradient||vector of partial derivatives
+        #    = 1/m * X'(y - Xw)
+        #    = 1/m * X'(error)
+        dJ = (1/m) * X.T.dot(error)
+        assert dJ.shape == self.weights.shape, "dJ should have the same dims as y"
+        return np.asscalar(J), dJ
+
+    # Learning function
+    def batch_gradient_descent(self, X, y, alpha=1e-3, maxiters=np.inf,
+            tolerance=1e-9, **kwargs):
+        """
+        .. math::
+            \\theta_{j} := \\alpha\\frac{1}{m}\sum_{i=1}^m
+                     (h_{\\theta}(x^{(i)})-y^{(i)})x_{j}^{(i)}
+        """
+        # A general default is to initialize weights to zero.
+        if self.weights is None:
+            self.weights = np.zeros((X.shape[1], 1))  # A column vector
+            log.info("Zero'd %d model parameters", len(self.weights))
+
         change = sys.float_info.max  # Largest possible Python float
-        if not self.weights:
-            self.weights = np.zeros(X.shape[1])
-        prevJ, iters, starttime = .0, 0, time.perf_counter()
-        while change > tolerance:  # Check for convergence
+        prevJ, iters, starttime = np.inf, 0, time.perf_counter()
+        while change > tolerance and iters < maxiters:  # Check for convergence
             # Find cost and partial derivatives for update
             J, dJ = self.cost(X, y)
             # Update each weight by a "step", its respective partial derivative.
@@ -132,50 +161,54 @@ class LinearRegression:
             # Multiplying by alpha, a fraction, reduces our chance of
             # overstepping and overshooting our target
             self.weights -= alpha * dJ
-            change = math.abs(prevJ - J)
-            log.debug("Change in cost: %.3e".format(change))
+            change = math.fabs(prevJ - J)
+            log.debug("Change in cost: %.3e", change)
             prevJ, iters = J, iters + 1
 
-        log.info("Converged w/ cost %.3e".format(J))
+        log.info("Converged w/ cost %.3e", J)
         return self.weights, {
             'cost': J,  # Final cost
             'iterations': iters,
-            'time': starttime - time.perf_counter()
+            'time': time.perf_counter() - starttime
         }
 
-    def stochastic_gradient_descent(self, X, y, alpha=.01, tolerance=1e-9,
-            **kwargs):
-        change = sys.float_info.max
-        if not self.weights:
-            self.weights = np.zeros(X.shape[1])
-        prevJ, iters, starttime = .0, 0, time.perf_counter()
-        log.info("Shuffling input...")
-        # Pandas DataFrame's let you randomly sample a fraction of its values.
-        # A fraction of 1 is the same as sampling 100% of all values.
-        X = shuffle(X)
+    # Learning function
+    def stochastic_gradient_descent(self, X, y, alpha=1e-3, maxiters=np.inf,
+            tolerance=1e-9, **kwargs):
+        # A general default is to initialize weights to zero.
+        if self.weights is None:
+            self.weights = np.zeros((X.shape[1], 1))  # A column vector
+            log.info("Zero'd %d model parameters", len(self.weights))
 
         # We can consider iteration through a randomly shuffled X a random
         # sampling from X
-        for x in X:
-            start = time.clock()
-            # Find cost and partial derivatives for update
-            J, dJ = self._least_squares(x, y)
-            # Update each weight by a "step", its respective partial derivative.
-            # Using a vector (numpy array) lets us update in parallel.
-            # Multiplying by alpha, a fraction, reduces our chance of
-            # overstepping and overshooting our target
-            self.weights -= alpha * dJ
-            change = math.fabs(prevJ - J)
-            log.debug("Change in cost: %.3e", change)
-            if change < tolerance:  # Check for convergence
-                break
-            prevJ, iters = J, iters + 1
-            perflog.debug("SGD iteration took %.3f seconds",
-                          time.clock() - start)
+        X, y = shuffle(X, y)
+        iters, starttime, = 0, time.perf_counter()
+        change, prevJ = sys.float_info.max, np.inf
+        while change > tolerance and iters < maxiters:
+            for i, x in enumerate(X):
+                # Find cost and partial derivatives for update
+                J, dJ = self.cost(
+                        x.reshape((1, x.shape[0])),  # => (1 x features) row vector
+                        y[i].reshape((1,1))  # => 1x1 matrix|column vector
+                        )
+                # assert J < prevJ, "Cost is increasing"
+                # Update each weight by a "step", its respective partial derivative.
+                # Using a vector (numpy array) lets us update in parallel.
+                # Multiplying by alpha, a fraction, reduces our chance of
+                # overstepping and thus overshooting our target
+                self.weights -= alpha * dJ
+                # Check for convergence
+                change = math.fabs(prevJ - J)
+                log.debug("Change in cost: %.3e", change)
+                if change < tolerance or iters >= maxiters:
+                    break
+                # Prepare for next iteration
+                prevJ, iters = J, iters + 1
 
         log.info("Converged w/ cost %.3e", J)
         return self.weights, {
             'cost': J,
             'iterations': iters,
-            'time': starttime - time.perf_counter()
+            'time': time.perf_counter() - starttime
         }

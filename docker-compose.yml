@@ -8,4 +8,7 @@ services:
     volumes:
       - ./:/src
     command: >
-      py.test -v -s --pdb mlsl/tests
+      py.test -v -s
+      --pdb
+      --cov mlsl
+      mlsl/tests

@@ -3,13 +3,14 @@ import textwrap
 import time
 from collections import namedtuple
 
+import numpy as np
 import pandas
 import pytest
 from sklearn.cross_validation import train_test_split
 
 from mlsl.linreg import LinearRegression
 from mlsl.log import testlog, perflog
-from mlsl import MLSL_DIR
+from mlsl import MLSL_DIR, util
 
 
 TrainTestSplit = namedtuple("TrainTestSplit", ["X_train", "X_test",
@@ -57,6 +58,80 @@ def dataset(request):
 
 def test_dataset_loading(dataset):
     pass
+
+
+def test_least_squares():
+    TC = namedtuple('TC', ['X', 'y', 'theta', 'cost', 'grad'])
+    testcases = [
+        TC(np.array([[1, 2], [1, 3], [1, 4], [1, 5]]),
+           np.array([[7,6,5,4]]).T,
+           np.array([[0.1, 0.2]]).T,
+           11.9450,
+           None),
+        TC(np.array([[1,2,3], [1,3,4], [1,4,5], [1,5,6]]),
+           np.array([[7,6,5,4]]).T,
+           np.array([[0.1, 0.2, 0.3]]).T,
+           7.0175,
+           None),
+    ]
+    for tc in testcases:
+        lr = LinearRegression()
+        lr.weights = tc.theta
+        cost, _ = lr._least_squares(tc.X, tc.y)
+        assert np.isclose(tc.cost, cost, 1e-3)
+
+
+@pytest.mark.skip()
+def test_regularized_least_squares():
+    TC = namedtuple('TC', ['X', 'y', 'theta', 'lambda_', 'cost', 'grad'])
+    testcases = [
+        TC(np.array([[1, 1, 1]]),
+           np.array([[7, 6, 5]]).T,
+           np.array([[.1, .2, .3, .4]]).T,
+           0,
+           1.3533,
+           np.array([[-1.4, -8.7333, -4.3333, -7.9333]]).T),
+        TC(np.array([[1, 2, 3, 4]]),
+           np.array([[5]].T),
+           np.array([[0.1, 0.2, 0.3, 0.4]]).T,
+           7,
+           3.015,
+           np.array([[-2., -2.6, -3.9, -5.2]]).T)
+    ]
+    for tc in testcases:
+        lr = LinearRegression()
+        lr.weights = tc.theta
+        cost, grad = lr._least_squares(tc.X, tc.y, lambda_=tc.lambda_)
+        assert tc.cost == cost
+        assert tc.grad == grad
+
+
+def test_gradient_descent():
+    TC = namedtuple('TC', ['X', 'y', 'theta', 'alpha', 'iters', 'weights'])
+    testcases = [
+        TC(np.array([[1, 5], [1, 2], [1, 4], [1, 5]], dtype=np.int64),
+           np.array([[1, 6, 4, 2]]).T,
+           np.array([[0., 0.]]).T,
+           0.01,
+           1000,
+           np.array([[5.2148, -0.5733]]).T),
+        TC(np.array([[1, 5], [1, 2]]),
+           np.array([[1, 6]]).T,
+           np.array([[.5, .5]]).T,
+           0.1,
+           10,
+           np.array([[1.70986, 0.19229]]).T)
+        ]
+    optimizers = (
+        LinearRegression.batch_gradient_descent,
+        LinearRegression.stochastic_gradient_descent
+    )
+    for minfn in optimizers:
+        for tc in testcases:
+            lr = LinearRegression()
+            lr.weights = tc.theta
+            w, meta = minfn(lr, tc.X, tc.y, alpha=tc.alpha, maxiters=tc.iters)
+            assert np.allclose(lr.weights, tc.weights, 1e-4)
 
 
 def test_linear_regression(dataset):
