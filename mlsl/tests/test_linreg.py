@@ -1,25 +1,24 @@
-import os
 import textwrap
 import time
 from collections import namedtuple
 
 import numpy as np
-import pandas
 import pytest
 from sklearn.cross_validation import train_test_split
 
-from mlsl.dataset import Dataset, DATASET_DIR, TrainTestSplit
+from mlsl import dataset, MLSL_TESTDATA
 from mlsl.linreg import LinearRegression
 from mlsl.log import testlog, perflog
 
 
 # Collection of datasets fit for Linear Regression
 linreg_datasets = (
-    Dataset(None, 'mlfoundations/kc_house_data.csv', '1', 'price',
-            ['bedrooms', 'bathrooms', 'sqft_living', 'sqft_lot', 'floors',
-             'waterfront', 'view', 'condition', 'grade', 'sqft_above',
-             'sqft_basement', 'yr_built', 'yr_renovated', 'zipcode',
-             'lat', 'long', 'sqft_living15', 'sqft_lot15', 'price']),
+    dataset.Dataset(
+        None, 'mlfoundations/kc_house_data.csv', '1', 'price',
+        ['bedrooms', 'bathrooms', 'sqft_living', 'sqft_lot', 'floors',
+         'waterfront', 'view', 'condition', 'grade', 'sqft_above',
+         'sqft_basement', 'yr_built', 'yr_renovated', 'zipcode',
+         'lat', 'long', 'sqft_living15', 'sqft_lot15', 'price']),
 )
 
 
@@ -27,11 +26,10 @@ linreg_datasets = (
 def dataset(request):
     """Provide a dataset for consumption by tests."""
     ds = request.param  # Get this iteration's Dataset
-    datapath = os.path.join(DATASET_DIR, ds.relpath)
     # Create a new Dataset tuple with the loaded data
     testlog.debug("Reading Pandas DataFrame from %s...", ds.relpath)
     start = time.clock()
-    df = pandas.read_csv(datapath)
+    df = dataset.load(ds.relpath, root=MLSL_TESTDATA)
     # Subset data to just our desired features
     df = df[ds.features]
     perflog.info("Read %s to Pandas DataFrame in %.3f seconds",
@@ -43,7 +41,7 @@ def dataset(request):
     Memory Usage: %d bytes
     """), df.shape[1], df.columns, df.shape[0], df.memory_usage().sum())
 
-    yield ds._replace(data=df, relpath=datapath)
+    yield ds._replace(data=df)
 
 
 def test_dataset_loading(dataset):
@@ -136,7 +134,7 @@ def test_linear_regression(dataset):
 
     # Split off 20% of our data for testing
     start = time.clock()
-    tt_data = TrainTestSplit(*train_test_split(X, y, test_size=.2))
+    tt_data = dataset.TrainTestSplit(*train_test_split(X, y, test_size=.2))
     perflog.debug("Created train/test split in %.3f seconds",
                   time.clock() - start)
 
