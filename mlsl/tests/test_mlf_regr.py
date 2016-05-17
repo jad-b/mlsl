@@ -17,8 +17,8 @@ def data():
     tt_data = dataset.load_and_split('mlfoundations/kc_house_data.csv',
                                      root=mlsl.MLSL_TESTDATA,
                                      features=['sqft_living'],
-                                     target=['price'],
-                                     split=.8)
+                                     target='price',
+                                     split=.2)
     yield tt_data
 
 

@@ -9,19 +9,20 @@ As their concern is getting the data to a consumable state, I don't feel it
 necessary to intentionally reinvent the wheel with these guys.
 """
 import os
+import textwrap
 from collections import namedtuple
 
 import pandas
 from sklearn.cross_validation import train_test_split
 
+from mlsl.log import log
 
 # Default to ~/datasets
 DATASET_DIR = os.getenv('MLSL_DATASETS',
                         os.path.join(os.path.expanduser('~'), 'datasets'))
-Dataset = namedtuple(
-    "Dataset",
-    ["data",      # Loaded data
-     "relpath",   # Path to the source of the data on the filesystem
+Metadata = namedtuple(
+    "Metadata",
+    ["relpath",   # Path to the source of the data on the filesystem
      "accuracy",  # Prediction accuracy our model should reach
      "target",    # The feature we're trying to predict
      "features"]  # A sub-set of features of the data we're going to train on
@@ -34,7 +35,7 @@ def load_and_split(path: str,
                    root='',
                    features=None,
                    target='',
-                   split=0.8):
+                   split=0.2):
     """Load and divide a dataset into training/test splits.
 
     Args:
@@ -51,7 +52,9 @@ def load_and_split(path: str,
     # Load the data
     df = load(path, root=root)
     assert isinstance(df, pandas.DataFrame)
+    # Extract our "target"; the feature we wish to predict
     y = df.pop(target)
+    # Subset the data to just our desired features
     X = df[features]
     # Split the data
     return TrainTestSplit(*train_test_split(X, y, test_size=split))
@@ -71,8 +74,19 @@ def load(path, root=''):
     if root:
         path = os.path.join(root, path)
     _, ext = os.path.splitext(path)
+    fn = None
     if ext == '.csv':
-        return pandas.read_csv(path)
+        fn = pandas.read_csv
     if ext == '.json':
-        return pandas.read_json(path)
-    raise TypeError("Unsupported file extension: " + ext)
+        fn = pandas.read_json
+    if fn is None:
+        raise TypeError("Unsupported file extension: " + ext)
+    log.debug("Reading Pandas DataFrame from %s...", path)
+    df = fn(path)
+    log.info(textwrap.dedent("""Loaded DataFrame:
+    # of Features: (%d)
+    Feature labels: %s
+    # of Samples: %d
+    Memory Usage: %d bytes
+    """), df.shape[1], df.columns, df.shape[0], df.memory_usage().sum())
+    return df
