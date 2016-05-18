@@ -1,4 +1,3 @@
-import math
 from io import StringIO
 
 import numpy as np
@@ -13,6 +12,7 @@ def prepare_data_matrix(X):
     # Pandas DataFrames have some more complicated behaviour when it comes to
     # iteration.
     npX = to_ndarray(X)
+    assert X.ndim == 2, "X should be a matrix"
     # Add a "bias" column of 1s. Since multiplying by 1 acts as a no-op, we
     # can learn a parameter to describe the "bias" in the data.
     return add_bias_column(npX)
@@ -32,17 +32,41 @@ def to_ndarray(X):
                     "from unsupported type '{}'".format(type(X)))
     finally:
         if ret is not None:
-            assert isinstance(ret, np.ndarray) # Call me paranoid.
+            assert isinstance(ret, np.ndarray)  # Call me paranoid.
             return ret
+
+
+def feature_normalize(X):
+    """Normalize the features of X."""
+    mu = X.mean(axis=0)    # Mean of each column (feature)
+    sigma = X.std(axis=0)  # Std. dev. of each feature
+    if has_bias_column(X):
+        X[:, 1:] = X[:, 1:] - mu[1:]
+        X[:, 1:] = X[:, 1:] / sigma[1:]
+    else:
+        X = X - mu
+        X /= sigma
+    return X, mu, sigma
 
 
 def add_bias_column(X):
     """Idempotently prefix a column of ones to ndarray."""
-    ones = np.ones(len(X))
-    if not np.array_equal(X[:,0], ones):  # Missing a column of 1s
+    if not has_bias_column(X):  # Missing a column of 1s
+        ones = np.ones(len(X))
         return np.c_[ones, X]
     else:
         return X
+
+
+def has_bias_column(X):
+    """Test if the first column is all 1s."""
+    return is_bias_column(X[:, 0])
+
+
+def is_bias_column(x):
+    """Boolean test if column is all 1s."""
+    ones = np.ones(len(x))
+    return np.array_equal(x, ones)  # Missing a column of 1s
 
 
 def to_col_vec(x):
@@ -51,7 +75,7 @@ def to_col_vec(x):
     If it's a 1D array, then the extra dimension is added.
     If it's a matrix, an exception is raised.
     """
-    if x.nimd == 2 and x.shape[1] == 1:
+    if x.ndim == 2 and x.shape[1] == 1:
         return x  # Already a column vector
     if x.ndim < 2:  # 1D array
         # Wrap in another array and return the tranpose
@@ -66,15 +90,6 @@ def to_col_vec(x):
     """.format(x.ndim, x.shape, x))
 
 
-def feature_normalize(X):
-    """Normalize the features of X."""
-    mu = X.mean(axis=1)    # Mean of each column (feature)
-    sigma = X.std(axis=1)  # Std. dev. of each feature
-    Xn = X- mu
-    Xn /= sigma
-    return Xn, mu, sigma
-
-
 def assert_shape(a, x):
     assert a.shape == x, _obs_exp(a.shape, x)
 
@@ -86,7 +101,11 @@ def format_metadata(meta):
     for k, v in sorted(meta.items()):
         sio.write("{key} = %({key})".format(key=k))
         if isinstance(v, float):
-            sio.write(".3f")
+            # mill >= value < giga
+            if v >= 1e-3 and v <= 1e9:
+                sio.write(".3f")
+            else:
+                sio.write(".3e")
         elif isinstance(v, int):
             sio.write("d")
         elif isinstance(v, str):

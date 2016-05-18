@@ -15,18 +15,12 @@ from collections import namedtuple
 import pandas
 from sklearn.cross_validation import train_test_split
 
+from mlsl import util
 from mlsl.log import log
 
 # Default to ~/datasets
 DATASET_DIR = os.getenv('MLSL_DATASETS',
                         os.path.join(os.path.expanduser('~'), 'datasets'))
-Metadata = namedtuple(
-    "Metadata",
-    ["relpath",   # Path to the source of the data on the filesystem
-     "accuracy",  # Prediction accuracy our model should reach
-     "target",    # The feature we're trying to predict
-     "features"]  # A sub-set of features of the data we're going to train on
-)
 TrainTestSplit = namedtuple("TrainTestSplit", ["X_train", "X_test",
                                                "y_train", "y_test"])
 
@@ -53,7 +47,7 @@ def load_and_split(path: str,
     df = load(path, root=root)
     assert isinstance(df, pandas.DataFrame)
     # Extract our "target"; the feature we wish to predict
-    y = df.pop(target)
+    y = util.to_col_vec(df.pop(target))
     # Subset the data to just our desired features
     X = df[features]
     # Split the data

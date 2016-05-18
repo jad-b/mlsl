@@ -5,12 +5,14 @@ import pytest
 
 from mlsl import dataset, MLSL_TESTDATA
 from mlsl.linreg import LinearRegression
+from mlsl.metadata import Metadata
 
 
 # Collection of datasets fit for Linear Regression
 linreg_datasets = (
-    dataset.Metadata(
-        relpath='mlfoundations/kc_house_data.csv', accuracy=.7,
+    Metadata(
+        data=None,
+        path='mlfoundations/kc_house_data.csv',
         target='price',
         features=[
             'bedrooms', 'bathrooms', 'sqft_living',
@@ -26,7 +28,7 @@ def data(request):
     """Provide a dataset for consumption by tests."""
     metadata = request.param  # Get this iteration's Dataset
     # Create a new Dataset tuple with the loaded data
-    yield dataset.load_and_split(metadata.relpath, root=MLSL_TESTDATA,
+    yield dataset.load_and_split(metadata.path, root=MLSL_TESTDATA,
                                  features=metadata.features,
                                  target=metadata.target)
 

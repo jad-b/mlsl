@@ -17,3 +17,8 @@ their end, or I need to publish.
 
 [^missile]:
     https://www.google.com/webhp?sourceid=chrome-instant&ion=1&espv=2&es_th=1&ie=UTF-8#q=+define+missile
+
+## Todo
+* [ ] Linear Regression
+    - [ ] Normalize data before operations
+        - Store normalization parameters (mu, sigma) with model for re-use.

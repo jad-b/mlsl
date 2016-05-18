@@ -11,7 +11,7 @@ from mlsl import util
 
 
 class LinearRegression:
-    """Linear regression fits a line to data points, like in a scatter plot.
+    """Linear regression fits a line to data points.
 
     You've already encountered linear regression: y = mx + b, or the equation
     for a line, given one input _x_ and two constants, slope (m) and intercept
@@ -30,15 +30,21 @@ class LinearRegression:
     def __init__(self, *, weights=None):
         self.weights = weights
         self.accuracy = None
+        #: Mean and standard deviation used to normalize the data
+        self.normalize = {
+            'mean': None,
+            'std': None
+        }
 
-    def fit(self, X, y, fn=None, **kwargs):
+    def fit(self, X, y, fn=None, normalize=False, **kwargs):
         """Fit the model to the data. Learns || updates model parameters."""
         # Allow the user to determine how we learn the model parameters.
         if fn is None:
             fn = self.batch_gradient_descent
-        X, y = util.prepare_data_matrix(X), util.to_ndarray(y)
-        if y.ndim != 2 or y.shape[1] != 1:  # If y's not a column vector
-            y = y.reshape((len(y), 1))
+        X, y = util.prepare_data_matrix(X), util.to_col_vec(y)
+        if normalize:
+            X, mu, sigma = util.feature_normalize(X)
+
         log.debug("Fitting model to data (%d samples x %d features)",
                   X.shape[0], X.shape[1])
 
@@ -65,6 +71,7 @@ class LinearRegression:
             calculus, it is the partial derivatives of the overall cost with
             respect to each variable.
         """
+        X, y = util.prepare_data_matrix(X), util.to_col_vec(y)
         J, dJ = self._least_squares(X, y)
         return J, dJ
 
@@ -75,6 +82,7 @@ class LinearRegression:
             h_{\\theta}(x) = \\theta_{0} + \\theta_{1}x
         """
         start = time.clock()
+        X = util.prepare_data_matrix(X)
         h = X.dot(self.weights)
         perflog.info("Predicted %d values in %.3f seconds", X.shape[1],
                      time.clock() - start)
@@ -82,7 +90,7 @@ class LinearRegression:
 
     def evaluate(self, X, y):
         """Determine accuracy of our model against labeled data (y)."""
-        X, y = util.prepare_data_matrix(X), util.to_ndarray(y)
+        X, y = util.prepare_data_matrix(X), util.to_col_vec(y)
         h = self.predict(X)
         assert len(h) == len(y)
         self.accuracy = (h == y).sum() / len(y)
@@ -116,14 +124,14 @@ class LinearRegression:
             J(\\theta) =
                 \\frac{1}{2m}\sum_{i=1}^m(h_{\\theta}(x^{i}) - y^{i})^{2}
         """
-        assert X.ndim == 2, "X should be a matrix"
-        assert y.ndim == 2, "y should be a column vector"
-        assert y.shape[1] == 1, "y should be a column vector"
         m = len(y)  # Number of samples
         # J = The cost of our current model
         #   = 1/(2m) * sum((y - Xw)^2)
         #   = 1/(2m) * sum((predictions - actual)^2)
         # Our predictions
+        assert X.shape[1] == self.weights.shape[0], \
+                ("Can't multiply these matrices: {X.shape} x {w.shape}"
+                 .format(X=X, w=self.weights))
         predictions = X.dot(self.weights)
         # The error of our predictions, compared to the actual values
         error = predictions - y
@@ -153,6 +161,7 @@ class LinearRegression:
 
         change = sys.float_info.max  # Largest possible Python float
         prevJ, iters, starttime = np.inf, 0, time.perf_counter()
+        last = starttime
         while change > tolerance and iters < maxiters:  # Check for convergence
             # Find cost and partial derivatives for update
             J, dJ = self.cost(X, y)
@@ -162,7 +171,11 @@ class LinearRegression:
             # overstepping and overshooting our target
             self.weights -= alpha * dJ
             change = math.fabs(prevJ - J)
-            log.debug("Change in cost: %.3e", change)
+            # Throttle output by time
+            now = time.perf_counter()
+            if (now - last) >= .1:
+                log.debug("Change in cost: %.3e", change)
+                last = now
             prevJ, iters = J, iters + 1
 
         log.info("Converged w/ cost %.3e", J)
