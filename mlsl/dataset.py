@@ -50,6 +50,7 @@ def load_and_split(path: str,
     y = util.to_col_vec(df.pop(target))
     # Subset the data to just our desired features
     X = df[features]
+    X = util.prepare_data_matrix(X)
     # Split the data
     return TrainTestSplit(*train_test_split(X, y, test_size=split))
 

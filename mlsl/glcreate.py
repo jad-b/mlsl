@@ -13,9 +13,15 @@ import sys
 import time
 
 
+class VersionError(Exception):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
 def load_graphlab():
     if sys.version_info >= (3, 0):
-        raise "Graphlab is only available in Python 2"
+        raise VersionError("Graphlab is only available in Python 2")
     start = time.clock()  # noqa
     import graphlab
     gl_product_key = os.getenv('GLCREATE_PRODUCT_KEY', False)

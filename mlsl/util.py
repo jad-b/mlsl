@@ -36,10 +36,15 @@ def to_ndarray(X):
             return ret
 
 
-def feature_normalize(X):
-    """Normalize the features of X."""
-    mu = X.mean(axis=0)    # Mean of each column (feature)
-    sigma = X.std(axis=0)  # Std. dev. of each feature
+def feature_normalize(X, mu=None, sigma=None):
+    """Normalize the features of X.
+
+    Arguments:
+        mu: Mean to normalize by"""
+    if mu is None:
+        mu = X.mean(axis=0)    # Mean of each column (feature)
+    if sigma is None:
+        sigma = X.std(axis=0)  # Std. dev. of each feature
     if has_bias_column(X):
         X[:, 1:] = X[:, 1:] - mu[1:]
         X[:, 1:] = X[:, 1:] / sigma[1:]

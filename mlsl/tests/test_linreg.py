@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from mlsl import dataset, MLSL_TESTDATA
+from mlsl.log import testlog
 from mlsl.linreg import LinearRegression
 from mlsl.metadata import Metadata
 
@@ -33,7 +34,7 @@ def data(request):
                                  target=metadata.target)
 
 
-def test_least_squares():
+def testleast_squares():
     TC = namedtuple('TC', ['X', 'y', 'theta', 'cost', 'grad'])
     testcases = [
         TC(np.array([[1, 2], [1, 3], [1, 4], [1, 5]]),
@@ -50,12 +51,12 @@ def test_least_squares():
     for tc in testcases:
         lr = LinearRegression()
         lr.weights = tc.theta
-        cost, _ = lr._least_squares(tc.X, tc.y)
+        cost, _ = lr.least_squares(tc.X, tc.y)
         assert np.isclose(tc.cost, cost, 1e-3)
 
 
 @pytest.mark.skip()
-def test_regularized_least_squares():
+def test_regularizedleast_squares():
     TC = namedtuple('TC', ['X', 'y', 'theta', 'lambda_', 'cost', 'grad'])
     testcases = [
         TC(np.array([[1, 1, 1]]),
@@ -74,7 +75,7 @@ def test_regularized_least_squares():
     for tc in testcases:
         lr = LinearRegression()
         lr.weights = tc.theta
-        cost, grad = lr._least_squares(tc.X, tc.y, lambda_=tc.lambda_)
+        cost, grad = lr.least_squares(tc.X, tc.y, lambda_=tc.lambda_)
         assert tc.cost == cost
         assert tc.grad == grad
 
@@ -107,7 +108,6 @@ def test_gradient_descent():
             assert np.allclose(lr.weights, tc.weights, 1e-4)
 
 
-@pytest.mark.xfail(reason="Accuracy is just horrible")
 def test_linear_regression(data):
     # Setup
     model = LinearRegression()
@@ -116,5 +116,11 @@ def test_linear_regression(data):
     model.fit(data.X_train, data.y_train)
 
     # Assert
-    accuracy = model.evaluate(data.X_test, data.y_test)
-    assert accuracy >= .5, "Less than 50% accurate"
+    cost = model.evaluate(data.X_test, data.y_test)
+    testlog.info("\nCost of Linear Regression model: %.3e" +
+                 "\nCost of Baseline model (mean): %.3e",
+                 cost['rss'], cost['baseline'])
+    if cost['rss'] > cost['baseline']:
+        diff = cost['rss'] / cost['baseline']
+        pytest.fail("Our model was {:.2f} costlier than predicting the mean"
+                    .format(diff))
