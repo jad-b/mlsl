@@ -5,8 +5,14 @@ services:
     build:
       dockerfile: Dockerfile.test
       context: .
+    environment:
+      DISPLAY: ${DISPLAY}
     volumes:
       - ./:/src
+      - ~/.Xauthority:/home/jovyan/.Xauthority
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    ipc: host
+    user: jovyan
     command: >
       py.test -v -s
       --pdb
